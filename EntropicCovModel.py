@@ -19,6 +19,7 @@ from scipy.linalg import sqrtm
 
 
 class Optimizer:
+    # TODO - William: Implement Bregman Projection Optimization Project
     @staticmethod
     def gradient_descent(gradient, start, learn_rate, n_iter, tolerance=1e-06):
         """
@@ -104,8 +105,7 @@ class AbstractSubspaceBasis(ABC):
     """
     Define an abstract base class as an interface of a basis. This allows
     flexible extensions on the choice of basis for the (affine) linear subspace
-    TODO: Wait for Tuesday's meeting to decide whether the choosing of basis
-          is necessary
+    TODO - William: Implement the Basis/Feature Maps
     """
     @abstractmethod
     def get_subspace_basis(self):
@@ -166,8 +166,8 @@ if __name__ == "__main__":
     # Block of cov matrix
     Sigma11 = [[1, 0.5],
                [0.5, 1]]
-    Sigma12 = [[0.2, 0.4],
-               [1, 0.3]]
+    Sigma12 = [[0.3, 0.1],
+               [0.2, 0.4]]
     Sigma21 = [[0.3, 0.2],
                [0.1, 0.4]]
     Sigma22 = [[1, 0.3],
