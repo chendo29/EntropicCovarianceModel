@@ -101,22 +101,56 @@ class LinkFunctionFactory:
             raise ValueError(f"Unknown link type: {link_type}")
 
 
-class AbstractSubspaceBasis(ABC):
+class FeatureMapBase(ABC):
     """
-    Define an abstract base class as an interface of a basis. This allows
-    flexible extensions on the choice of basis for the (affine) linear subspace
-    TODO - William: Implement the Basis/Feature Maps
+    Define an abstract base class as an interface for a feature mapping. This allows
+    flexible extensions for the choice of maps taking design matrix X into basis for
+    the linear subspace.
     """
+
     @abstractmethod
-    def get_subspace_basis(self):
+    def __call__(self, x):
         pass
+
+
+class ExampleFeatureMap(FeatureMapBase):
+    # Feature map compatible with toy example
+    def __call__(self, x):
+        u1 = np.array([[x[0], 0],
+                       [0, 0]])
+        u2 = np.array([[0, 0],
+                       [0, x[0]]])
+        u3 = np.array([[x[1], 0],
+                       [0, 0]])
+        u4 = np.array([[0, 0],
+                       [0, x[1]]])
+        u5 = np.array([[1, 0],
+                       [0, 0]])
+        u6 = np.array([[0, 0],
+                       [0, 1]])
+        basis = [u1, u2, u3, u4, u5, u6]
+        return basis
+
+
+class SubspaceBases:
+    """
+    Class that stores list of bases for each linear subspace over which optimization
+    will occur. There is exactly one basis for every sample, each of which is
+    constructed with the same feature mapping.
+    """
+    def __init__(self, feature_map, design_matrices):
+        # Element i represents [U_i1,...,U_il] in JASA paper
+        self.bases = [feature_map(xi) for xi in design_matrices]
+
+    def get_subspace_basis(self):
+        return self.bases
 
 
 class EntropicCovModel:
     """
     This is a class that holding the information with the following field
-    1. The link function (nabala F)
-    2. The inverse of link function (nabala F^*)
+    1. The link function (nabla F)
+    2. The inverse of link function (nabla F^*)
     3. The design matrix X
     4. The response vector Y
     """
