@@ -105,7 +105,7 @@ class FeatureMapBase(ABC):
     """
     Define an abstract base class as an interface for a feature mapping. This allows
     flexible extensions for the choice of maps taking design matrix X into basis for
-    the linear subspace.
+    the linear subspace of symmetric matrices.
     """
 
     @abstractmethod
@@ -128,13 +128,19 @@ class ExampleFeatureMap(FeatureMapBase):
                        [0, 0]])
         u6 = np.array([[0, 0],
                        [0, 1]])
-        basis = [u1, u2, u3, u4, u5, u6]
+        u7 = np.array([[0, 1],
+                       [1, 0]])
+        u8 = np.array([[0, x[0]],
+                       [x[0], 0]])
+        u9 = np.array([[0, x[1]],
+                       [x[1], 0]])
+        basis = [u1, u2, u3, u4, u5, u6, u7, u8, u9]
         return basis
 
 
 class SubspaceBases:
     """
-    Class that stores list of bases for each linear subspace over which optimization
+    Store list of bases for each linear subspace over which optimization
     will occur. There is exactly one basis for every sample, each of which is
     constructed with the same feature mapping.
     """
