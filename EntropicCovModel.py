@@ -114,7 +114,7 @@ class FeatureMapBase(ABC):
         pass
 
 
-class ExampleFeatureMap(FeatureMapBase):
+class ExampleFeatureMap_1(FeatureMapBase):
     # Feature map compatible with toy example
     # TODO: This is basis will cause Singular matrix if the initial guess is 1
     def __call__(self, x):
@@ -144,8 +144,8 @@ class FeatureMapFactory:
     # Define a feature map factory to produce concrete feature maps
     @staticmethod
     def create_feature_maps(map_type):
-        if map_type == "example_feature_map":
-            return ExampleFeatureMap()
+        if map_type == "example_feature_map_1":
+            return ExampleFeatureMap_1()
         else:
             raise ValueError(f"Unknown feature map type: {map_type}")
 
@@ -212,6 +212,12 @@ class EntropicCovModel:
         return Optimizer.gradient_descent(self.compute_gradient, initial_guess,
                                           learning_rate, num_iterations, tol)
 
+    def get_estimate(self, alpha):
+        A_alpha = self._compute_A_alpha(alpha)
+        estimates = [self.inverse_link_func(A_i) for A_i in A_alpha]
+
+        return estimates
+
     """
     The followings are private helper method to be used in the body of 
     compute_gradient
@@ -244,6 +250,7 @@ if __name__ == "__main__":
         i) m = cov(y_i,x_i)[cov(x_i,x_i)]^{-1}a
         ii) C = cov(y_i,y_i) - cov(y_i,x_i)cov(x_i,x_i)^{-1}cov(x_i,y_i)
     """
+
     # set seed to preserve the simulation results
     np.random.seed(1226789)
 
@@ -274,6 +281,10 @@ if __name__ == "__main__":
     X = samples[:, :2]
     Y = samples[:, -2:]
 
+    # Center Y|X
+    mean_Y_cond = np.array([Sigma21 @ np.linalg.inv(Sigma11) @ x for x in X])
+    Y = Y - mean_Y_cond
+
     print("Generated Samples:")
     print(samples)
     print("Generated X:")
@@ -282,12 +293,17 @@ if __name__ == "__main__":
     print(Y)
 
     # Construct the Entropic Covariance Model
-    model = EntropicCovModel("example_feature_map", "SMSI", X, Y)
+    model = EntropicCovModel("example_feature_map_1", "SMSI", X, Y)
     initial_guess = 100 * np.random.rand(9)
-    learning_rate = 0.01
-    num_iterations = 100
-    est_C = model.optimize(initial_guess, learning_rate, num_iterations)
-    print(est_C)
+    learning_rate = 0.0001
+    num_iterations = 500
+    est_alpha = model.optimize(initial_guess, learning_rate, num_iterations)
+    print(est_alpha)
+    # Print Estimate for one sample for readability
+    print("1st Target C:")
+    print(C)
+    print("1st Estimated C:")
+    print(model.get_estimate(est_alpha[-1])[0])
     a = 0
     # Example usage
     # def execute_function(func: LinkFunctionBase, *args, **kwargs):
