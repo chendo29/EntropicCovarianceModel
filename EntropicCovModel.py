@@ -58,6 +58,7 @@ class LinkFunctionBase(ABC):
     future since one can implement a new concrete child class
     for a new link function
     """
+
     @abstractmethod
     def __call__(self, *args, **kwargs):
         pass
@@ -115,6 +116,7 @@ class FeatureMapBase(ABC):
 
 class ExampleFeatureMap(FeatureMapBase):
     # Feature map compatible with toy example
+    # TODO: This is basis will cause Singular matrix if the initial guess is 1
     def __call__(self, x):
         u1 = np.array([[x[0], 0],
                        [0, 0]])
@@ -138,14 +140,26 @@ class ExampleFeatureMap(FeatureMapBase):
         return basis
 
 
+class FeatureMapFactory:
+    # Define a feature map factory to produce concrete feature maps
+    @staticmethod
+    def create_feature_maps(map_type):
+        if map_type == "example_feature_map":
+            return ExampleFeatureMap()
+        else:
+            raise ValueError(f"Unknown feature map type: {map_type}")
+
+
 class SubspaceBases:
     """
     Store list of bases for each linear subspace over which optimization
     will occur. There is exactly one basis for every sample, each of which is
     constructed with the same feature mapping.
     """
-    def __init__(self, feature_map, design_matrices):
+
+    def __init__(self, feature_map_type, design_matrices):
         # Element i represents [U_i1,...,U_il] in JASA paper
+        feature_map = FeatureMapFactory.create_feature_maps(feature_map_type)
         self.bases = [feature_map(xi) for xi in design_matrices]
 
     def get_subspace_basis(self):
@@ -160,10 +174,13 @@ class EntropicCovModel:
     3. The design matrix X
     4. The response vector Y
     """
-    def __init__(self, link_type, design_matrix, response_vector):
-        self.link_func, self.inverse_link_func = LinkFunctionFactory.create_links(link_type)
-        self.X = design_matrix
+
+    def __init__(self, feature_map_type, link_type, design_matrix,
+                 response_vector):
+        self.link_func, self.inverse_link_func \
+            = LinkFunctionFactory.create_links(link_type)
         self.Y = response_vector
+        self.bases = SubspaceBases(feature_map_type, design_matrix).get_subspace_basis()
 
     def apply_link_func(self, mat):
         return self.link_func(mat)
@@ -171,14 +188,50 @@ class EntropicCovModel:
     def apply_inverse_link_func(self, mat):
         return self.inverse_link_func(mat)
 
-    def compute_gradient(self):
-        # TODO: Complete this function after Tuesday's meeting
-        pass
+    def compute_gradient(self, alpha):
+        """
+        This method computes the gradient our loss function evaluated at point
+        alpha. The loss function is defined to be the sum of Bregman divergence.
+        :param alpha: the coefficient of the regression model applied on
+        link-function transformation of the covariance matrix
+        :return: the gradient of the loss function at point alpha. Equivalently
+        a vector lives in R^l, where l is the number of features.
+        """
+        A_alpha = self._compute_A_alpha(alpha)
+        gradient = np.zeros_like(alpha)
+        for i in range(len(self.Y)):
+            A_i_alpha = A_alpha[i]
+            y_i = self.Y[i]
+            M = self.apply_link_func(A_i_alpha) - np.dot(y_i, y_i)
+            U = self.bases[i]
+            gradient += self._adjoint_map(U, M)
+        return gradient
 
     def optimize(self, initial_guess, learning_rate,
                  num_iterations, tol=1e-06):
-        # TODO: Complete this function after Tuesday's meeting
-        pass
+        return Optimizer.gradient_descent(self.compute_gradient, initial_guess,
+                                          learning_rate, num_iterations, tol)
+
+    """
+    The followings are private helper method to be used in the body of 
+    compute_gradient
+    """
+    def _compute_A_alpha(self, alpha):
+        # Private helper method to compute A_i(alpha) for all i
+        A_alpha = []
+        for basis in self.bases:
+            weighted_matrices = [weight * mat for weight, mat in zip(alpha, basis)]
+            A_alpha.append(np.sum(weighted_matrices, axis=0))
+        return A_alpha
+
+    def _adjoint_map(self, basis_list, m):
+        # Private helper method to compute the adjoint A^* with some input
+        # matrix m
+        vec = []
+        for u in basis_list:
+            mat = u @ m
+            vec.append(np.trace(mat))
+        return vec
 
 
 if __name__ == "__main__":
@@ -199,9 +252,9 @@ if __name__ == "__main__":
 
     # Define the covariance matrix (4x4)
     Sigma = [[1, 0.5, 0.3, 0.1],
-           [0.5, 1, 0.2, 0.4],
-           [0.3, 0.2, 1, 0.3],
-           [0.1, 0.4, 0.3, 1]]
+             [0.5, 1, 0.2, 0.4],
+             [0.3, 0.2, 1, 0.3],
+             [0.1, 0.4, 0.3, 1]]
 
     # Block of cov matrix
     Sigma11 = [[1, 0.5],
@@ -229,9 +282,13 @@ if __name__ == "__main__":
     print(Y)
 
     # Construct the Entropic Covariance Model
-    model = EntropicCovModel("SMSI", X, Y)
-    # TODO: est_C = model.optimize()
+    model = EntropicCovModel("example_feature_map", "SMSI", X, Y)
+    initial_guess = 100 * np.random.rand(9)
+    learning_rate = 0.01
+    num_iterations = 100
+    est_C = model.optimize(initial_guess, learning_rate, num_iterations)
+    print(est_C)
+    a = 0
     # Example usage
     # def execute_function(func: LinkFunctionBase, *args, **kwargs):
     #    return func(*args, **kwargs)
-
