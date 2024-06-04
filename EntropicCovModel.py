@@ -202,7 +202,7 @@ class EntropicCovModel:
         for i in range(len(self.Y)):
             A_i_alpha = A_alpha[i]
             y_i = self.Y[i]
-            M = self.apply_link_func(A_i_alpha) - np.dot(y_i, y_i)
+            M = self.apply_link_func(A_i_alpha) - np.outer(y_i, y_i)
             U = self.bases[i]
             gradient += self._adjoint_map(U, M)
         return gradient
