@@ -273,7 +273,7 @@ if __name__ == "__main__":
         i) m = cov(y_i,x_i)[cov(x_i,x_i)]^{-1}a
         ii) C = cov(y_i,y_i) - cov(y_i,x_i)cov(x_i,x_i)^{-1}cov(x_i,y_i)
     """
-    """
+
     # set seed to preserve the simulation results
     np.random.seed(1226789)
 
@@ -331,7 +331,7 @@ if __name__ == "__main__":
     # Example usage
     # def execute_function(func: LinkFunctionBase, *args, **kwargs):
     #    return func(*args, **kwargs)
-    """
+
     """
         Second Toy Test is to first simulate a covariate from a 1-d normal distribution. Then use the simulated values
         to generate the observations 2-d multivariate observations. This causes the y_i samples to come from distinct
@@ -346,6 +346,7 @@ if __name__ == "__main__":
         
         Target alpha is [-5, -1, -3, 1, -3, 1]
     """
+
     np.random.seed(1226789)
 
     X = np.random.normal(5, 1, 150)
