@@ -21,7 +21,7 @@ from scipy.linalg import sqrtm
 class Optimizer:
     # TODO - William: Implement Bregman Projection Optimization Project
     @staticmethod
-    def gradient_descent(gradient, start, learn_rate, n_iter, tolerance=1e-06):
+    def gradient_descent(gradient, start, learn_rate, n_iter, tolerance=1e-05):
         """
         Performs gradient descent optimization.
 
@@ -114,7 +114,7 @@ class FeatureMapBase(ABC):
         pass
 
 
-class ExampleFeatureMap_1(FeatureMapBase):
+class ExampleFeatureMap1(FeatureMapBase):
     # Feature map compatible with toy example
     # TODO: This is basis will cause Singular matrix if the initial guess is 1
     def __call__(self, x):
@@ -140,12 +140,33 @@ class ExampleFeatureMap_1(FeatureMapBase):
         return basis
 
 
+class ExampleFeatureMap2(FeatureMapBase):
+    # Feature map compatible with second toy example
+    def __call__(self, x):
+        u1 = np.array([[1, 0],
+                       [0, 0]])
+        u2 = np.array([[x, 0],
+                       [0, 0]])
+        u3 = np.array([[0, 0],
+                       [0, 1]])
+        u4 = np.array([[0, 0],
+                       [0, x]])
+        u5 = np.array([[0, 1],
+                       [1, 0]])
+        u6 = np.array([[0, x],
+                       [x, 0]])
+        basis = [u1, u2, u3, u4, u5, u6]
+        return basis
+
+
 class FeatureMapFactory:
     # Define a feature map factory to produce concrete feature maps
     @staticmethod
     def create_feature_maps(map_type):
         if map_type == "example_feature_map_1":
-            return ExampleFeatureMap_1()
+            return ExampleFeatureMap1()
+        elif map_type == "example_feature_map_2":
+            return ExampleFeatureMap2()
         else:
             raise ValueError(f"Unknown feature map type: {map_type}")
 
@@ -205,10 +226,12 @@ class EntropicCovModel:
             M = self.apply_link_func(A_i_alpha) - np.outer(y_i, y_i)
             U = self.bases[i]
             gradient += self._adjoint_map(U, M)
+        # Normalize gradient to avoid having to adjust LR when increasing number of samples
+        gradient = gradient/len(self.Y)
         return gradient
 
     def optimize(self, initial_guess, learning_rate,
-                 num_iterations, tol=1e-06):
+                 num_iterations, tol=1e-05):
         return Optimizer.gradient_descent(self.compute_gradient, initial_guess,
                                           learning_rate, num_iterations, tol)
 
@@ -250,7 +273,7 @@ if __name__ == "__main__":
         i) m = cov(y_i,x_i)[cov(x_i,x_i)]^{-1}a
         ii) C = cov(y_i,y_i) - cov(y_i,x_i)cov(x_i,x_i)^{-1}cov(x_i,y_i)
     """
-
+    """
     # set seed to preserve the simulation results
     np.random.seed(1226789)
 
@@ -308,3 +331,54 @@ if __name__ == "__main__":
     # Example usage
     # def execute_function(func: LinkFunctionBase, *args, **kwargs):
     #    return func(*args, **kwargs)
+    """
+    """
+        Second Toy Test is to first simulate a covariate from a 1-d normal distribution. Then use the simulated values
+        to generate the observations 2-d multivariate observations. This causes the y_i samples to come from distinct
+        distributions whereas in first test after centering the y_i's are iid. The setup is identical to the first 
+        simulation from "The Matrix-Logarithmic Covariance Model"
+            i) x_i ~ N(5, 1)
+            ii) y_i ~ MVN(0, C(x_i))
+        Where the covariance is given as a function of x_i
+        C(x_i) = apply_inverse_link_func(A(x_i))
+        A(x_i) = [[-5 - x_i, -3 + x_i],
+                  [-3 + x_i, -3 + x_i]]
+        
+        Target alpha is [-5, -1, -3, 1, -3, 1]
+    """
+    np.random.seed(1226789)
+
+    X = np.random.normal(5, 1, 150)
+    A = np.array([[[-5 - x, -3 + x], [-3 + x, -3 + x]] for x in X])
+
+    #We can try a way of implementing the transformation that doesn't conflict with factory design philosophy
+    transform, inverse_transform = LinkFunctionFactory.create_links("SMSI")
+    C = np.array([inverse_transform(a) for a in A])
+    m = [0, 0]
+
+    Y = [np.random.multivariate_normal(m, c) for c in C]
+
+    model = EntropicCovModel("example_feature_map_2", "SMSI", X, Y)
+    initial_guess = 10 * np.random.rand(6)
+    learning_rate = 0.03
+    num_iterations = 10000
+    est_alpha = model.optimize(initial_guess, learning_rate, num_iterations)
+
+    for s in range(len(est_alpha)//50 - 1):
+        print('1st C Estimate: ' + str(s*50))
+        print(model.get_estimate(est_alpha[s*50])[0])
+
+    print('Final C Estimate: ')
+    print(model.get_estimate(est_alpha[-1])[0])
+
+    # Print Estimate for one sample for readability
+    print("1st Target C:")
+    print(C[0])
+
+    print("Initial alpha guess:")
+    print(initial_guess)
+    print("Estimated alpha:")
+    print(est_alpha[-1])
+    print("Target alpha:")
+    print([-5, -1, -3, 1, -3, 1])
+
