@@ -18,7 +18,7 @@ from scipy.linalg import expm
 from scipy.linalg import sqrtm
 
 from FeatureMapping import FeatureMapFactory
-from NumericalUtils import Optimizer
+from NumericalUtils import OptimizerFactory
 
 
 class LinkFunctionBase(ABC):
@@ -72,9 +72,6 @@ class LinkFunctionFactory:
             raise ValueError(f"Unknown link type: {link_type}")
 
 
-
-
-
 class SubspaceBases:
     """
     Store list of bases for each linear subspace over which optimization
@@ -98,14 +95,28 @@ class EntropicCovModel:
     2. The inverse of link function (nabla F^*)
     3. The design matrix X
     4. The response vector Y
+    5. The optimizer
     """
 
     def __init__(self, feature_map_type, link_type, design_matrix,
-                 response_vector):
+                 response_vector, optimizer_type, optimization_conifg):
+        """
+
+        :param feature_map_type: type of the feature map
+        :param link_type: type of the link function
+        :param design_matrix: X
+        :param response_vector: Y
+        :param optimizer_type: type of the optimizer
+        :param optimization_conifg: configuration for the optimizer to conduct
+        its optimization routine
+        """
         self.link_func, self.inverse_link_func \
             = LinkFunctionFactory.create_links(link_type)
         self.Y = response_vector
         self.bases = SubspaceBases(feature_map_type, design_matrix).get_subspace_basis()
+        self.optimizer = OptimizerFactory.create_optimizer(optimizer_type,
+                                                           optimization_conifg,
+                                                           self)
 
     def apply_link_func(self, mat):
         return self.link_func(mat)
@@ -134,10 +145,8 @@ class EntropicCovModel:
         gradient = gradient/len(self.Y)
         return gradient
 
-    def optimize(self, initial_guess, learning_rate,
-                 num_iterations, tol=1e-05):
-        return Optimizer.gradient_descent(self.compute_gradient, initial_guess,
-                                          learning_rate, num_iterations, tol)
+    def fit(self):
+        return self.optimizer.optimize()
 
     def get_estimate(self, alpha):
         A_alpha = self._compute_A_alpha(alpha)

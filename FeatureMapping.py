@@ -28,7 +28,7 @@ class FeatureMapBase(ABC):
 
 class ExampleFeatureMap1(FeatureMapBase):
     # Feature map compatible with toy example
-    # TODO: This is basis will cause Singular matrix if the initial guess is 1
+    # Warning: This basis will cause Singular matrix if the initial guess is 1
     def __call__(self, x):
         u1 = np.array([[x[0], 0],
                        [0, 0]])
