@@ -106,9 +106,11 @@ class ADMM(Optimizer):
     def optimize(self, *args, **kwargs):
         pass
 
+    """
     @abstractmethod
     def single_thread_optimize(self, *args, **kwargs):
         pass
+        """
 
 
 class ADMM_GD(ADMM):
@@ -133,12 +135,14 @@ class ADMM_GD(ADMM):
         self.num_of_samples = optimization_config["num_of_samples"]
 
     def optimize(self):
-        for _ in range(self.max_iter):
+        print("Iterations:")
+        for it in range(self.max_iter):
+            print(str(it + 1) + "/" + str(self.max_iter))
             # batch updates of alphas
             self._batch_alpha_update()
             # update for the center position
             cumulative_center_pos = (self.alpha_list +
-                                     (self.ancillary_pos / self.penalty_rate))
+                                     (self.ancillary_pos_list / self.penalty_rate))
             new_center_pos = np.mean(cumulative_center_pos, axis=0)
             if np.all(np.abs(new_center_pos - self.center_pos)
                       <= self.tolerance):
@@ -153,28 +157,46 @@ class ADMM_GD(ADMM):
     """
     def _batch_alpha_update(self):
         process = []
+
+        manager = mp.Manager()
+        shared_alpha = manager.list([alpha.copy() for alpha in self.alpha_list])
+
+        lock = mp.Lock()
+
         for i in range(self.num_of_samples):
-            p = mp.Process(target=self._update_alpha_single_thread, args=(i,))
+            p = mp.Process(target=self._update_alpha_single_thread,
+                           args=(i, shared_alpha, lock))
             process.append(p)
             p.start()
         for p in process:
             p.join()
+
+        self.alpha_list = np.array(shared_alpha)
 
     def _batch_ancillary_pos_update(self):
         process = []
+
+        manager = mp.Manager()
+        shared_ancillary_pos = manager.list([ancillary_pos.copy() for ancillary_pos
+                                             in self.ancillary_pos_list])
+
+        lock = mp.Lock()
+
         for i in range(self.num_of_samples):
             p = mp.Process(target=self._update_ancillary_pos_single_thread,
-                           args=(i,))
+                           args=(i, shared_ancillary_pos, lock))
             process.append(p)
             p.start()
         for p in process:
             p.join()
 
-    def _update_alpha_single_thread(self, i):
+        self.ancillary_pos_lis = np.array(shared_ancillary_pos)
+
+    def _update_alpha_single_thread(self, i, shared_alpha, lock):
         # Update the gradient function based on the current center_pos z^{k} and
         # current ancillary_pos w^{k}
         center_pos = self.center_pos
-        ancillary_pos = self.ancillary_pos[i]
+        ancillary_pos = self.ancillary_pos_list[i]
 
         def gradient_function(x):
             return (self.loss_function_gradient(x) +
@@ -183,17 +205,22 @@ class ADMM_GD(ADMM):
                     ancillary_pos)
 
         self.single_thread_optimizer.set_gradient_function(gradient_function)
+        # Only take final estimate of updated alpha
         updated_alpha = self.single_thread_optimizer.optimize()
-        self.alpha_list[i] = updated_alpha
+        with lock:
+            shared_alpha[i] = updated_alpha[-1]
 
-    def _update_ancillary_pos_single_thread(self, i):
+    def _update_ancillary_pos_single_thread(self, i, shared_ancillary_pos, lock):
         updated_alpha = self.alpha_list[i]
         updated_center_post = self.center_pos
-        curr_ancillary_post = self.ancillary_pos[i]
+        curr_ancillary_post = self.ancillary_pos_list[i]
         updated_ancillary_pos = (curr_ancillary_post +
                                  self.penalty_rate *
                                  (updated_alpha - updated_center_post))
-        self.ancillary_pos_list[i] = updated_ancillary_pos
+
+        with lock:
+            shared_ancillary_pos[i] = updated_ancillary_pos
+
 
 
 class OptimizerFactory:
@@ -203,6 +230,11 @@ class OptimizerFactory:
         if optimizer_type == "GradientDescent":
             optimization_config["gradient"] = target_model.compute_gradient
             return GradientDescent(optimization_config)
+        elif optimizer_type == "ADMM GD":
+            optimization_config["loss_function_gradient"] = target_model.compute_gradient
+            # Initializing GradientDescent requires "gradient" key exists in config
+            optimization_config["single_thread_optimizer_config"]["gradient"] = None
+            return ADMM_GD(optimization_config)
         else:
             raise ValueError(f"Unknown Optimizer type: {optimizer_type}")
 
