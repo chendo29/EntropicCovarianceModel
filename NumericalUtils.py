@@ -222,6 +222,95 @@ class ADMM_GD(ADMM):
             shared_ancillary_pos[i] = updated_ancillary_pos
 
 
+class ADMM_GD_NoPen(ADMM):
+    def __init__(self, optimization_config):
+        super().__init__()
+        self.single_thread_optimizer = GradientDescent(
+            optimization_config["single_thread_optimizer_config"])
+        self.center_pos = np.zeros(optimization_config["alpha_dim"])
+        self.ancillary_pos_list = np.zeros(
+            (optimization_config["num_of_samples"],
+             optimization_config["alpha_dim"]))
+        self.alpha_list = np.zeros(
+            (optimization_config["num_of_samples"],
+             optimization_config["alpha_dim"]))
+        self.max_iter = optimization_config["max_iter"]
+        self.tolerance = optimization_config["tolerance"]
+        self.loss_function_gradient = optimization_config[
+            "loss_function_gradient"]
+        self.num_of_samples = optimization_config["num_of_samples"]
+
+    def optimize(self):
+        print("Iterations:")
+        for it in range(self.max_iter):
+            print(str(it + 1) + "/" + str(self.max_iter))
+            # batch updates of alphas
+            self._batch_alpha_update()
+            # update for the center position
+            cumulative_center_pos = self.alpha_list
+            new_center_pos = np.mean(cumulative_center_pos, axis=0)
+            if np.all(np.abs(new_center_pos - self.center_pos)
+                      <= self.tolerance):
+                break
+            self.center_pos = new_center_pos
+            # batch updates of ancillary positions
+        return self.center_pos
+
+    """
+        Private helper methods for optimize
+    """
+    def _batch_alpha_update(self):
+        process = []
+
+        manager = mp.Manager()
+        shared_alpha = manager.list([alpha.copy() for alpha in self.alpha_list])
+
+        lock = mp.Lock()
+
+        for i in range(self.num_of_samples):
+            p = mp.Process(target=self._update_alpha_single_thread,
+                           args=(i, shared_alpha, lock))
+            process.append(p)
+            p.start()
+        for p in process:
+            p.join()
+
+        self.alpha_list = np.array(shared_alpha)
+
+    def _batch_ancillary_pos_update(self):
+        process = []
+
+        manager = mp.Manager()
+        shared_ancillary_pos = manager.list([ancillary_pos.copy() for ancillary_pos
+                                             in self.ancillary_pos_list])
+
+        lock = mp.Lock()
+
+        for i in range(self.num_of_samples):
+            p = mp.Process(target=self._update_ancillary_pos_single_thread,
+                           args=(i, shared_ancillary_pos, lock))
+            process.append(p)
+            p.start()
+        for p in process:
+            p.join()
+
+        self.ancillary_pos_lis = np.array(shared_ancillary_pos)
+
+    def _update_alpha_single_thread(self, i, shared_alpha, lock):
+        # Update the gradient function based on the current center_pos z^{k} and
+        # current ancillary_pos w^{k}
+        center_pos = self.center_pos
+        ancillary_pos = self.ancillary_pos_list[i]
+
+        def gradient_function(x):
+            return (self.loss_function_gradient(x))
+
+        self.single_thread_optimizer.set_gradient_function(gradient_function)
+        # Only take final estimate of updated alpha
+        updated_alpha = self.single_thread_optimizer.optimize()
+        with lock:
+            shared_alpha[i] = updated_alpha[-1]
+
 
 class OptimizerFactory:
     # Define an Optimizer factory to produce various optimizer
@@ -235,6 +324,10 @@ class OptimizerFactory:
             # Initializing GradientDescent requires "gradient" key exists in config
             optimization_config["single_thread_optimizer_config"]["gradient"] = None
             return ADMM_GD(optimization_config)
+        elif optimizer_type == "ADMM GD No Pen":
+            optimization_config["loss_function_gradient"] = target_model.compute_gradient
+            optimization_config["single_thread_optimizer_config"]["gradient"] = None
+            return ADMM_GD_NoPen(optimization_config)
         else:
             raise ValueError(f"Unknown Optimizer type: {optimizer_type}")
 

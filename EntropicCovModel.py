@@ -60,14 +60,54 @@ class InverseSMSI(LinkFunctionBase):
         return 0.5 * (mat + sqrtm(mat_bar))
 
 
+class FunctionBase(ABC):
+    """
+    Define an abstract base class as an interface of the base function.
+    This allows flexible extensions on the family of base functions in the
+    future since one can implement a new concrete child class
+    for a new base function.
+    """
+
+    @abstractmethod
+    def __call__(self, *args, **kwargs):
+        pass
+
+
+class SMSIBaseFunction(FunctionBase):
+    # Base function that induces the SMSI link function
+    def __call__(self, mat):
+        return 1/2*(np.trace(mat @ mat)) - np.log(np.linalg.det(mat))
+
+
+class LogBaseFunction(FunctionBase):
+    # Base function that induces the log base function
+    def __call__(self, mat):
+        return -1*np.trace(mat - mat@logm(mat))
+
+
+class SMSIBaseConjugate(FunctionBase):
+    # Conjugate of Base Function that induces SMSI link function
+    def __call__(self, mat):
+        num_rows = mat.shape[0]
+        mat_bar = mat @ mat + 4 * np.eye(num_rows)
+        mat2 = 0.5 * (mat + sqrtm(mat_bar))
+        return np.trace(mat@mat2 - 0.5*mat2@mat2 + logm(mat2))
+
+
+class LogBaseConjugate(FunctionBase):
+    # Conjugate of Base Function that induces log link function
+    def __call__(self, mat):
+        return np.trace(expm(mat))
+
+
 class LinkFunctionFactory:
     # Define a link function factory to produce link functions and its inverse
     @staticmethod
     def create_links(link_type):
         if link_type == "log":
-            return Log(), InverseLog()
+            return Log(), InverseLog(), LogBaseFunction(), LogBaseConjugate()
         elif link_type == "SMSI":
-            return SMSI(), InverseSMSI()
+            return SMSI(), InverseSMSI(), SMSIBaseFunction(), SMSIBaseConjugate()
         else:
             raise ValueError(f"Unknown link type: {link_type}")
 
@@ -110,8 +150,8 @@ class EntropicCovModel:
         :param optimization_conifg: configuration for the optimizer to conduct
         its optimization routine
         """
-        self.link_func, self.inverse_link_func \
-            = LinkFunctionFactory.create_links(link_type)
+        self.link_func, self.inverse_link_func, self.base_func, \
+        self.base_func_conjugate = LinkFunctionFactory.create_links(link_type)
         self.Y = response_vector
         self.bases = SubspaceBases(feature_map_type, design_matrix).get_subspace_basis()
         self.optimizer = OptimizerFactory.create_optimizer(optimizer_type,
@@ -123,6 +163,10 @@ class EntropicCovModel:
 
     def apply_inverse_link_func(self, mat):
         return self.inverse_link_func(mat)
+
+    def compute_bregman_div(self, mat1, mat2):
+        # Compute Bregman without first term in case mat1 is not PSD
+        return self.base_func(mat1) + self.base_func_conjugate(mat2) - np.trace(mat1@mat2)
 
     def compute_gradient(self, alpha):
         """
