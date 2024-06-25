@@ -189,6 +189,34 @@ class EntropicCovModel:
         gradient = gradient/len(self.Y)
         return gradient
 
+    def compute_batch_gradient(self, alpha, batch_indices):
+        """
+        This method computes the gradient of each term of our loss function
+        evaluated at point alpha. The loss function is defined to be the sum
+        of Bregman divergence. This method computes the gradient of each term
+        of our loss function associated to the elements of our batch evaluated
+        at point alpha. The loss function is defined to be the sum of Bregman
+        divergence.
+        :param alpha: the coefficient of the regression model applied on
+        link-function transformation of the covariance matrix
+        :param batch_indices: the indices of the batch for stochastic gradient
+        descent
+        :return: the gradient of the loss function at point alpha. Equivalently
+        a vector lives in R^l, where l is the number of features.
+        """
+        A_alpha = self._compute_A_alpha(alpha)
+        gradient = np.zeros_like(alpha)
+
+        for i in batch_indices:
+            A_i_alpha = A_alpha[i]
+            y_i = self.Y[i]
+            M = self.apply_link_func(A_i_alpha) - np.outer(y_i, y_i)
+            U = self.bases[i]
+            gradient += self._adjoint_map(U, M)
+        # Normalize gradient to avoid having to adjust LR when increasing number of samples
+        gradient = gradient/len(batch_indices)
+        return gradient
+
     def fit(self):
         return self.optimizer.optimize()
 

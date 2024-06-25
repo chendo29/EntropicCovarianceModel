@@ -94,6 +94,72 @@ class GradientDescent(Optimizer):
         return self.gradient_function
 
 
+class SGD(Optimizer):
+    """
+    Performs stochastic gradient descent optimization.
+
+    Fields:
+    - gradient_function: Function to compute the gradient of the function to be minimized.
+    - initial_guess: Initial starting point for the algorithm.
+    - learning_rate: Learning rate (step size) for each iteration.
+    - n_iter: Number of iterations to perform.
+    - tolerance: Tolerance for stopping criteria.
+
+    """
+
+    def __init__(self, optimization_config):
+        super().__init__()
+        self.gradient_function = optimization_config['gradient']
+        self.initial_guess = optimization_config['initial_guess']
+        self.learning_rate = optimization_config['learning_rate']
+        self.n_iter = optimization_config['n_iter']
+        self.tolerance = optimization_config['tolerance']
+        self.batch_size = optimization_config['batch_size']
+        self.random_sample = optimization_config['random']
+        self.num_samples = optimization_config['num_samples']
+
+    def optimize(self):
+        """
+        :return: vector of positions for each iteration
+        """
+
+        x = self.initial_guess
+        positions = [x]
+        batch_counter = 0
+        for it in range(self.n_iter):
+            print(str(it) + '/' + str(self.n_iter))
+            if self.random_sample:
+                # Randomly samples batches of specified size
+                # Slow for large sample size
+                batch_indices = np.random.choice(self.num_samples,
+                                                 size=self.batch_size,
+                                                 replace=False)
+            else:
+                # Cycles through samples in order
+                batch_indices = list(range(batch_counter*self.batch_size,
+                                           (batch_counter + 1)*self.batch_size))
+
+                batch_counter += 1
+                if (batch_counter + 1)*self.batch_size > self.num_samples:
+                    batch_counter = 0
+            grad = self.gradient_function(x, batch_indices)
+            x_new = x - self.learning_rate * grad
+            positions.append(x_new)
+
+            # Stop if the change is smaller than the tolerance
+            if np.all(np.abs(x_new - x) <= self.tolerance):
+                break
+            x = x_new
+
+        return np.array(positions)
+
+    def set_gradient_function(self, gradient_function):
+        self.gradient_function = gradient_function
+
+    def get_gradient_function(self):
+        return self.gradient_function
+
+
 class ADMM(Optimizer):
     def __init__(self):
         super().__init__()
@@ -319,9 +385,11 @@ class OptimizerFactory:
         if optimizer_type == "GradientDescent":
             optimization_config["gradient"] = target_model.compute_gradient
             return GradientDescent(optimization_config)
+        elif optimizer_type == "SGD":
+            optimization_config["gradient"] = target_model.compute_batch_gradient
+            return SGD(optimization_config)
         elif optimizer_type == "ADMM GD":
             optimization_config["loss_function_gradient"] = target_model.compute_gradient
-            # Initializing GradientDescent requires "gradient" key exists in config
             optimization_config["single_thread_optimizer_config"]["gradient"] = None
             return ADMM_GD(optimization_config)
         elif optimizer_type == "ADMM GD No Pen":

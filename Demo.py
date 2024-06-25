@@ -231,16 +231,16 @@ if __name__ == "__main__":
     estimates across every simulation size.
     """
 
-    sim_samples = [10, 50, 100, 250, 500, 1000, 2500, 5000]
+    sim_samples = [10, 50, 100, 250, 500, 1000, 2500, 5000, 7500, 10000]
     np.random.seed(1226789)
     simulated_alphas = {10: [], 50: [], 100: [], 250: [], 500: [], 1000: [],
-                        2500: [], 5000: []}
+                        2500: [], 5000: [], 7500: [], 10000: []}
     estimates = {10: [], 50: [], 100: [], 250: [], 500: [], 1000: [],
-                 2500: [], 5000: []}
+                 2500: [], 5000: [], 7500: [], 10000: []}
     sample_covariances = {10: [], 50: [], 100: [], 250: [], 500: [], 1000: [],
-                          2500: [], 5000: []}
+                          2500: [], 5000: [], 7500: [], 10000: []}
     target_values = {10: [], 50: [], 100: [], 250: [], 500: [], 1000: [],
-                     2500: [], 5000: []}
+                      2500: [], 5000: [], 7500: [], 10000: []}
     for sim_sample in sim_samples:
         print("Simulation with: " + str(sim_sample))
         X = np.random.normal(5, 1, sim_sample)
@@ -379,3 +379,117 @@ if __name__ == "__main__":
     print(est_alpha)
     print("Target alpha:")
     print([-5, -1, -3, 1, -3, 1])
+
+if __name__ == "1__main__":
+    #TODO Gradient computation of log eventually becomes a complex number
+    """
+    Identical to the second toy test in terms of set up. We then compare the 
+    performance of models using the SMSI link function and the log link funciton.
+        i) x_i ~ N(5, 1)
+        ii) y_i ~ MVN(0, C(x_i))
+    Where the covariance is given as a function of x_i
+    C(x_i) = apply_inverse_link_func(A(x_i))
+    A(x_i) = [[-5 - x_i, -3 + x_i],
+              [-3 + x_i, -3 + x_i]]
+
+    Target alpha is [-5, -1, -3, 1, -3, 1]
+    """
+
+    np.random.seed(1226789)
+
+    num_samples = 100
+    X = np.random.normal(5, 1, num_samples)
+    A = np.array([[[-5 - x, -3 + x], [-3 + x, -3 + x]] for x in X])
+
+    # We can try a way of implementing the transformation that doesn't conflict
+    # with factory design philosophy
+    transform, inverse_transform, _, _ = LinkFunctionFactory.create_links("SMSI")
+    C = np.array([inverse_transform(a) for a in A])
+    m = [0, 0]
+
+    Y = [np.random.multivariate_normal(m, c) for c in C]
+
+    # Construct the Entropic Covariance Model
+    optimizer_type = "GradientDescent"
+    initial_guess = 10 * np.random.rand(6)
+    learning_rate = 0.01
+    num_iterations = 500
+    optimization_config = {"initial_guess": initial_guess,
+                           "learning_rate": learning_rate,
+                           "n_iter": num_iterations,
+                           "tolerance": 1e-05}
+    model_SMSI = EntropicCovModel("example_feature_map_2",
+                             "SMSI", X, Y,
+                             optimizer_type, optimization_config)
+
+    print("Training SMSI")
+    est_alpha_SMSI = model_SMSI.fit()
+
+    model_log = EntropicCovModel("example_feature_map_2",
+                                 "log", X, Y,
+                                 optimizer_type, optimization_config)
+
+    print("Training log")
+    est_alpha_log = model_log.fit()
+
+    print("True Paramters: [-5, -1, -3, 1, -3, 1]" )
+    print("SMSI Estimates: " + str(est_alpha_SMSI[-1]))
+    print("Log Estimates: " + str(est_alpha_log[-1]))
+
+
+if __name__ == "__main__":
+    """
+    Identical to the second toy test in terms of set up. We then compare the 
+    performance of models using the SMSI link function and the log link funciton.
+    The difference is that optimization is performed using Stochastic Gradient
+    Descent.
+        i) x_i ~ N(5, 1)
+        ii) y_i ~ MVN(0, C(x_i))
+    Where the covariance is given as a function of x_i
+    C(x_i) = apply_inverse_link_func(A(x_i))
+    A(x_i) = [[-5 - x_i, -3 + x_i],
+              [-3 + x_i, -3 + x_i]]
+
+    Target alpha is [-5, -1, -3, 1, -3, 1]
+    """
+
+    np.random.seed(1226789)
+
+    num_samples = 5000
+    X = np.random.normal(5, 1, num_samples)
+    A = np.array([[[-5 - x, -3 + x], [-3 + x, -3 + x]] for x in X])
+
+    # We can try a way of implementing the transformation that doesn't conflict
+    # with factory design philosophy
+    transform, inverse_transform, _, _ = LinkFunctionFactory.create_links("SMSI")
+    C = np.array([inverse_transform(a) for a in A])
+    m = [0, 0]
+
+    Y = [np.random.multivariate_normal(m, c) for c in C]
+
+    # Construct the Entropic Covariance Model
+    optimizer_type = "SGD"
+    initial_guess = 10 * np.random.rand(6)
+    learning_rate = 0.01
+    num_iterations = 10000
+    batch_size = 1
+
+    # Determine whether batch is randomly sampled or cycles through data
+    # Setting to True can be cumbersome for large sample sizes
+    random_samples = False
+    optimization_config = {"initial_guess": initial_guess,
+                           "learning_rate": learning_rate,
+                           "n_iter": num_iterations,
+                           "tolerance": 1e-05,
+                           "batch_size": batch_size,
+                           "random": random_samples,
+                           "num_samples": num_samples}
+    model = EntropicCovModel("example_feature_map_2",
+                                  "SMSI", X, Y,
+                                  optimizer_type, optimization_config)
+
+    print("Training")
+    est_alpha = model.fit()
+
+    print("True Paramters: [-5, -1, -3, 1, -3, 1]" )
+    print("Estimates: " + str(est_alpha[-1]))
