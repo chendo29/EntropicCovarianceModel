@@ -94,9 +94,9 @@ class GradientDescent(Optimizer):
         return self.gradient_function
 
 
-class SGD(Optimizer):
+class GradientDescentParallel(Optimizer):
     """
-    Performs stochastic gradient descent optimization.
+    Performs gradient descent optimization with parallel computing across summands.
 
     Fields:
     - gradient_function: Function to compute the gradient of the function to be minimized.
@@ -114,8 +114,6 @@ class SGD(Optimizer):
         self.learning_rate = optimization_config['learning_rate']
         self.n_iter = optimization_config['n_iter']
         self.tolerance = optimization_config['tolerance']
-        self.batch_size = optimization_config['batch_size']
-        self.random_sample = optimization_config['random']
         self.num_samples = optimization_config['num_samples']
 
     def optimize(self):
@@ -125,23 +123,92 @@ class SGD(Optimizer):
 
         x = self.initial_guess
         positions = [x]
-        batch_counter = 0
-        for it in range(self.n_iter):
-            print(str(it) + '/' + str(self.n_iter))
-            if self.random_sample:
-                # Randomly samples batches of specified size
-                # Slow for large sample size
-                batch_indices = np.random.choice(self.num_samples,
-                                                 size=self.batch_size,
-                                                 replace=False)
-            else:
-                # Cycles through samples in order
-                batch_indices = list(range(batch_counter*self.batch_size,
-                                           (batch_counter + 1)*self.batch_size))
 
-                batch_counter += 1
-                if (batch_counter + 1)*self.batch_size > self.num_samples:
-                    batch_counter = 0
+        for it in range(self.n_iter):
+            grad = np.sum(self._compute_summands(x))
+            x_new = x - self.learning_rate * grad
+            positions.append(x_new)
+
+            # Stop if the change is smaller than the tolerance
+            if np.all(np.abs(x_new - x) <= self.tolerance):
+                break
+            x = x_new
+
+        return np.array(positions)
+
+    def _compute_summands(self, x):
+
+        process = []
+        manager = mp.Manager()
+        shared_gradient_terms = manager.list(np.zeros(self.num_samples))
+
+        lock = mp.Lock()
+
+        for i in range(self.num_samples):
+            p = mp.Process(target=self._compute_summands_single_thread,
+                           args=(i, x, shared_gradient_terms, lock))
+            process.append(p)
+            p.start()
+        for p in process:
+            p.join()
+
+        return np.array(shared_gradient_terms)
+
+    def _compute_summands_single_thread(self, i, x, shared_gradient_terms, lock):
+        # Update the gradient function based on the current center_pos z^{k} and
+        # current ancillary_pos w^{k}
+
+        with lock:
+            shared_gradient_terms[i] = self.gradient_function(x, [i])
+
+    def set_gradient_function(self, gradient_function):
+        self.gradient_function = gradient_function
+
+    def get_gradient_function(self):
+        return self.gradient_function
+
+
+class SGD(Optimizer):
+    """
+    Performs stochastic gradient descent optimization.
+
+    Fields:
+    - gradient_function: Function to compute the gradient of the function to be minimized.
+    - initial_guess: Initial starting point for the algorithm.
+    - learning_rate: Learning rate (step size) for each iteration.
+    - n_iter: Number of iterations to perform.
+    - tolerance: Tolerance for stopping criteria.
+    - num_samples: Total number of samples
+
+    """
+
+    def __init__(self, optimization_config):
+        super().__init__()
+        self.gradient_function = optimization_config['gradient']
+        self.initial_guess = optimization_config['initial_guess']
+        self.learning_rate = optimization_config['learning_rate']
+        self.n_iter = optimization_config['n_iter']
+        self.tolerance = optimization_config['tolerance']
+        self.batch_size = optimization_config['batch_size']
+        self.num_samples = optimization_config['num_samples']
+
+    def optimize(self):
+        """
+        :return: vector of positions for each iteration
+        """
+
+        x = self.initial_guess
+        positions = [x]
+        for it in range(self.n_iter):
+
+            if it%50 == 0:
+                print(str(it) + '/' + str(self.n_iter))
+
+            # Randomly samples batches of specified size
+            batch_indices = np.random.choice(self.num_samples,
+                                             size=self.batch_size,
+                                             replace=False)
+
             grad = self.gradient_function(x, batch_indices)
             x_new = x - self.learning_rate * grad
             positions.append(x_new)
@@ -385,6 +452,9 @@ class OptimizerFactory:
         if optimizer_type == "GradientDescent":
             optimization_config["gradient"] = target_model.compute_gradient
             return GradientDescent(optimization_config)
+        elif optimizer_type == "GradientDescentParallel":
+            optimization_config["gradient"] = target_model.compute_batch_gradient
+            return GradientDescentParallel(optimization_config)
         elif optimizer_type == "SGD":
             optimization_config["gradient"] = target_model.compute_batch_gradient
             return SGD(optimization_config)

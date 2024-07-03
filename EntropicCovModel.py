@@ -165,8 +165,12 @@ class EntropicCovModel:
         return self.inverse_link_func(mat)
 
     def compute_bregman_div(self, mat1, mat2):
-        # Compute Bregman without first term in case mat1 is not PSD
+        # Compute Bregman
         return self.base_func(mat1) + self.base_func_conjugate(mat2) - np.trace(mat1@mat2)
+
+    def compute_bregman_div_no_samp(self, mat1, mat2):
+        # Compute Bregman without first term in case mat1 is not PSD
+        return self.base_func_conjugate(mat2) - np.trace(mat1@mat2)
 
     def compute_gradient(self, alpha):
         """

@@ -4,10 +4,11 @@ This module contains demos on the usage of Entropic Covariance Model.
 
 """
 import numpy as np
-
 import matplotlib.pyplot as plt
+import time
 
 from EntropicCovModel import EntropicCovModel, LinkFunctionFactory
+
 
 if __name__ == "__main__":
     """
@@ -98,8 +99,9 @@ if __name__ == "__main__":
     """
 
     np.random.seed(1226789)
+    num_samples = 10
 
-    X = np.random.normal(5, 1, 10)
+    X = np.random.normal(5, 1, num_samples)
     A = np.array([[[-5 - x, -3 + x], [-3 + x, -3 + x]] for x in X])
 
     # We can try a way of implementing the transformation that doesn't conflict
@@ -114,16 +116,99 @@ if __name__ == "__main__":
     optimizer_type = "GradientDescent"
     initial_guess = 10 * np.random.rand(6)
     learning_rate = 0.03
-    num_iterations = 10000
+    num_iterations = 10
+
     optimization_config = {"initial_guess": initial_guess,
-                           "learning_rate": learning_rate,
-                           "n_iter": num_iterations,
-                           "tolerance": 1e-05}
+                                    "learning_rate": learning_rate,
+                                    "n_iter": num_iterations,
+                                    "tolerance": 1e-05,}
     model = EntropicCovModel("example_feature_map_2",
                              "SMSI", X, Y,
                              optimizer_type, optimization_config)
 
+    t = time.time()
     est_alpha = model.fit()
+    print(time.time()-t)
+
+    for s in range(len(est_alpha) // 50 - 1):
+        print('1st C Estimate: ' + str(s * 50))
+        print(model.get_estimate(est_alpha[s * 50])[0])
+
+    print('Final C Estimate: ')
+    print(model.get_estimate(est_alpha[-1])[0])
+
+    # Print Estimate for one sample for readability
+    print("1st Target C:")
+    print(C[0])
+
+    print("Initial alpha guess:")
+    print(initial_guess)
+    print("Estimated alpha:")
+    print(est_alpha[-1])
+    print("Target alpha:")
+    print([-5, -1, -3, 1, -3, 1])
+
+if __name__ == "__main__":
+    """
+    Toy tet to investigate benefits of parallel computation for gradient summands
+        i) x_i ~ N(5, 1)
+        ii) y_i ~ MVN(0, C(x_i))
+    Where the covariance is given as a function of x_i
+    C(x_i) = apply_inverse_link_func(A(x_i))
+    A(x_i) = [[-5 - x_i, -3 + x_i],
+              [-3 + x_i, -3 + x_i]]
+
+    Target alpha is [-5, -1, -3, 1, -3, 1]
+    """
+
+    np.random.seed(1226789)
+    num_samples = 100
+
+    X = np.random.normal(5, 1, num_samples)
+    A = np.array([[[-5 - x, -3 + x], [-3 + x, -3 + x]] for x in X])
+
+    # We can try a way of implementing the transformation that doesn't conflict
+    # with factory design philosophy
+    transform, inverse_transform, _, _ = LinkFunctionFactory.create_links("SMSI")
+    C = np.array([inverse_transform(a) for a in A])
+    m = [0, 0]
+
+    Y = [np.random.multivariate_normal(m, c) for c in C]
+
+    # Construct the Entropic Covariance Model
+    optimizer_type_parallel = "GradientDescentParallel"
+    initial_guess = 10 * np.random.rand(6)
+    learning_rate = 0.03
+    num_iterations = 10
+
+    # Gradient Descent with parallel computing
+    optimization_config_parallel = {"initial_guess": initial_guess,
+                           "learning_rate": learning_rate,
+                           "n_iter": num_iterations,
+                           "tolerance": 1e-05,
+                           "num_samples": num_samples}
+    model_parallel = EntropicCovModel("example_feature_map_2",
+                             "SMSI", X, Y,
+                             optimizer_type_parallel, optimization_config_parallel)
+
+    print("Parallel Test")
+    t = time.time()
+    est_alpha_parallel = model_parallel.fit()
+    print(time.time()-t)
+
+    # Gradient Descent without parallel computation
+    optimizer_type = "GradientDescent"
+    optimization_config = {"initial_guess": initial_guess,
+                                    "learning_rate": learning_rate,
+                                    "n_iter": num_iterations,
+                                    "tolerance": 1e-05,}
+    model = EntropicCovModel("example_feature_map_2",
+                                      "SMSI", X, Y,
+                                      optimizer_type, optimization_config)
+    print("Non-Parallel Test")
+    t = time.time()
+    est_alpha = model.fit()
+    print(time.time()-t)
 
     for s in range(len(est_alpha) // 50 - 1):
         print('1st C Estimate: ' + str(s * 50))
@@ -231,16 +316,12 @@ if __name__ == "__main__":
     estimates across every simulation size.
     """
 
-    sim_samples = [10, 50, 100, 250, 500, 1000, 2500, 5000, 7500, 10000]
+    sim_samples = [1000, 5000, 10000, 20000, 30000]
     np.random.seed(1226789)
-    simulated_alphas = {10: [], 50: [], 100: [], 250: [], 500: [], 1000: [],
-                        2500: [], 5000: [], 7500: [], 10000: []}
-    estimates = {10: [], 50: [], 100: [], 250: [], 500: [], 1000: [],
-                 2500: [], 5000: [], 7500: [], 10000: []}
-    sample_covariances = {10: [], 50: [], 100: [], 250: [], 500: [], 1000: [],
-                          2500: [], 5000: [], 7500: [], 10000: []}
-    target_values = {10: [], 50: [], 100: [], 250: [], 500: [], 1000: [],
-                      2500: [], 5000: [], 7500: [], 10000: []}
+    simulated_alphas = {}
+    estimates = {}
+    sample_covariances = {}
+    target_values = {}
     for sim_sample in sim_samples:
         print("Simulation with: " + str(sim_sample))
         X = np.random.normal(5, 1, sim_sample)
@@ -258,20 +339,24 @@ if __name__ == "__main__":
 
         sample_covs = [np.outer(y, y) for y in Y]
 
-        # Construct the Entropic Covariance Model
-        optimizer_type = "GradientDescent"
+        optimizer_type = "SGD"
         initial_guess = 10 * np.random.rand(6)
-        learning_rate = 0.003
-        num_iterations = 2500
+        learning_rate = 0.0005
+        num_iterations = 10000
+        batch_size = 250
+
         optimization_config = {"initial_guess": initial_guess,
                                "learning_rate": learning_rate,
                                "n_iter": num_iterations,
-                               "tolerance": 1e-05}
+                               "tolerance": 1e-05,
+                               "batch_size": batch_size,
+                               "num_samples": sim_sample}
         model = EntropicCovModel("example_feature_map_2",
                                  "SMSI", X, Y,
                                  optimizer_type, optimization_config)
 
         est_alpha = model.fit()
+
         simulated_alphas[sim_sample] = est_alpha[-1]
         estimates[sim_sample] = model.get_estimate(est_alpha[-1])
         sample_covariances[sim_sample] = sample_covs
@@ -314,7 +399,7 @@ if __name__ == "__main__":
     plt.xlabel('Sample Size')
     plt.ylabel('Bregman Divergence to True Covariance')
 
-    plt.savefig('divergence_to_target_vs_sample_labels.png', dpi=300, bbox_inches='tight')
+    plt.savefig('divergence_to_target_vs_sample_labels_30k_more_its.png', dpi=300, bbox_inches='tight')
 
     # Show the plot
     plt.close()
@@ -380,7 +465,7 @@ if __name__ == "__main__":
     print("Target alpha:")
     print([-5, -1, -3, 1, -3, 1])
 
-if __name__ == "1__main__":
+if __name__ == "__main__":
     #TODO Gradient computation of log eventually becomes a complex number
     """
     Identical to the second toy test in terms of set up. We then compare the 
@@ -455,7 +540,7 @@ if __name__ == "__main__":
 
     np.random.seed(1226789)
 
-    num_samples = 5000
+    num_samples = 50000
     X = np.random.normal(5, 1, num_samples)
     A = np.array([[[-5 - x, -3 + x], [-3 + x, -3 + x]] for x in X])
 
@@ -471,25 +556,46 @@ if __name__ == "__main__":
     optimizer_type = "SGD"
     initial_guess = 10 * np.random.rand(6)
     learning_rate = 0.01
-    num_iterations = 10000
-    batch_size = 1
+    num_iterations = 50
+    #batch_size = 10
 
-    # Determine whether batch is randomly sampled or cycles through data
-    # Setting to True can be cumbersome for large sample sizes
-    random_samples = False
-    optimization_config = {"initial_guess": initial_guess,
-                           "learning_rate": learning_rate,
-                           "n_iter": num_iterations,
-                           "tolerance": 1e-05,
-                           "batch_size": batch_size,
-                           "random": random_samples,
-                           "num_samples": num_samples}
-    model = EntropicCovModel("example_feature_map_2",
-                                  "SMSI", X, Y,
-                                  optimizer_type, optimization_config)
 
-    print("Training")
-    est_alpha = model.fit()
 
-    print("True Paramters: [-5, -1, -3, 1, -3, 1]" )
-    print("Estimates: " + str(est_alpha[-1]))
+    batch_sizes = [10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000]
+    train_time = []
+
+    for batch_size in batch_sizes:
+        print('batch size: ' + str(batch_size))
+        start_time = time.time()
+        optimization_config_model1 = {"initial_guess": initial_guess,
+                                      "learning_rate": learning_rate,
+                                      "n_iter": num_iterations,
+                                      "tolerance": 1e-05,
+                                      "batch_size": batch_size,
+                                      "num_samples": num_samples}
+        model = EntropicCovModel("example_feature_map_2",
+                                 "SMSI", X, Y,
+                                 optimizer_type, optimization_config_model1)
+
+        est_alpha = model.fit()
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        train_time.append(elapsed_time)
+
+    labels = [str(batch_size) for batch_size in batch_sizes]
+    # Create the bar chart
+    plt.figure(figsize=(10, 6))
+    bar_width = 0.5
+    plt.bar(labels, train_time, color='skyblue', width=bar_width)
+
+    # Add title and labels
+    plt.title('Training Time for 50 iterations vs Batch Size')
+    plt.xlabel('Batch Size')
+    plt.ylabel('Training Time')
+
+    plt.savefig('train_time_vs_batch_size_50k_samples.png', dpi=300, bbox_inches='tight')
+
+    # Show the plot
+    plt.close()
+
+
