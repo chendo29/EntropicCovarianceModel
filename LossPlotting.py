@@ -22,7 +22,7 @@ if __name__ == "__main__":
     Target alpha is [-5, -1, -3, 1, -3, 1]
     """
 
-    np.random.seed(12345)
+    np.random.seed(123456789)
     num_samples = 1
 
     X = np.random.normal(5, 1, num_samples)
@@ -55,12 +55,12 @@ if __name__ == "__main__":
     # Interpolates between initial guess and true covariance
     interp_losses = []
     num_steps = 250
-    interp_steps = list(range(num_steps*4))
+    interp_steps = list(range(num_steps*3))
     sample_cov = np.outer(Y[0], Y[0])
     true_value_mat = model.get_estimate(true_value)[0]
 
-    num_guesses = 8
-    guesses = [10 * np.random.rand(6) for _ in range(num_guesses)]
+    num_guesses = 12
+    guesses = [25 * np.random.rand(6) for _ in range(num_guesses)]
     interp_loss_list = []
     true_value_div = []
 
@@ -70,12 +70,12 @@ if __name__ == "__main__":
         true_value_div.append(model.compute_bregman_div_no_samp(sample_cov, true_value_mat))
         for t in interp_steps:
             interp = (1 - t/num_steps)*guess + (t/num_steps)*true_value
-            interp_mat = model.get_estimate(interp)[0]
+            interp_mat = model.get_A_alpha(interp)[0]
             interp_losses.append(model.compute_bregman_div_no_samp(sample_cov, interp_mat))
         print(interp_losses[0])
         interp_loss_list.append(interp_losses)
 
-    fig, axs = plt.subplots(num_guesses//2, 2, figsize=(12, 8))
+    fig, axs = plt.subplots(num_guesses//4, 4, figsize=(12, 8))
 
     counter = 0
     for ax in axs.flat:
@@ -86,13 +86,16 @@ if __name__ == "__main__":
             print('True Value Divergence: ' + str(true_value_div[counter]))
             print('Graph Minimum: ' + str(interp_loss_list[counter][min_index]))
             ax.axvline(x=interp_steps[num_steps], color='r', linestyle='--')
+            ax.set_title(f'Starting Value: {counter + 1}')
             counter += 1
 
     # Hide x labels and tick labels for top plots and y ticks for right plots.
     for ax in axs.flat:
         ax.label_outer()
 
-    plt.show()
+    fig.suptitle('Loss Landscape Interpolation', fontsize=16)
+    plt.savefig('loss_landscape.png', dpi=300, bbox_inches='tight')
+    plt.close()
 
 if __name__ == "__main__":
     """

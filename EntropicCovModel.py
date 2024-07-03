@@ -230,6 +230,9 @@ class EntropicCovModel:
 
         return estimates
 
+    def get_A_alpha(self, alpha):
+        return self._compute_A_alpha(alpha)
+
     """
     The followings are private helper method to be used in the body of 
     compute_gradient
