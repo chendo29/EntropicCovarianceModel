@@ -96,6 +96,75 @@ class NewtonMethod(Optimizer):
         return np.array(positions)
 
 
+class GraidentNewtonDescent(Optimizer):
+    """
+        Augmented descending optimization procedure to first conduct
+        gradient descent to get close to local optima then performs Newton's
+        method to boost the convergence rate
+
+        Fields:
+        - gradient_function: Function to compute the gradient of the function
+                            to be minimized.
+        - hessian_function: Function to compute the hessian of the function
+                            to be minimized.
+        - initial_guess: Initial starting point for the algorithm.
+        - learning_rate: Learning rate (step size) for each iteration
+        - n_iter_GD: Number of iterations to perform gradient descent.
+        - n_iter_newton: Number of iterations to perform Newton's method.
+        - tolerance: Tolerance for stopping criteria.
+    """
+
+    def __init__(self, optimization_config):
+        super().__init__()
+        self.gradient_function = optimization_config['gradient']
+        self.hessian_function = optimization_config['hessian']
+        self.initial_guess = optimization_config['initial_guess']
+        self.learning_rate = optimization_config['learning_rate_GD']
+        self.n_iter_gd = optimization_config['n_iter_GD']
+        self.n_iter_newton = optimization_config['n_iter_newton']
+        self.tolerance_gd = optimization_config['tolerance_gd']
+        self.tolerance = optimization_config['tolerance']
+
+    def optimize(self):
+        """
+        :return: vector of positions for each iteration
+        """
+
+        x = self.initial_guess
+        positions = [x]
+
+        for _ in range(self.n_iter_gd):
+            grad = self.gradient_function(x)
+            x_new = x - self.learning_rate * grad
+            positions.append(x_new)
+
+            # Stop if the change is smaller than the tolerance
+            if np.all(np.abs(x_new - x) <= self.tolerance_gd):
+                if np.all(np.abs(x_new - x) <= self.tolerance):
+                    return np.array(positions)
+                else:
+                    break
+            x = x_new
+
+        for _ in range(self.n_iter_newton):
+            grad = self.gradient_function(x)
+            hessian = self.hessian_function(x)
+            try:
+                hessian_inv = np.linalg.inv(hessian)
+            except np.linalg.LinAlgError:
+                print("Hessian is singular, stopping.")
+                break
+            x_new = x - np.dot(hessian_inv, grad)
+            positions.append(x_new)
+
+            # Stop if the change is smaller than the tolerance
+            if np.all(np.abs(x_new - x) <= self.tolerance):
+                break
+            x = x_new
+
+        return np.array(positions)
+
+
 class GradientDescent(Optimizer):
     """
     Performs gradient descent optimization.
@@ -288,12 +357,6 @@ class ADMM(Optimizer):
     @abstractmethod
     def optimize(self, *args, **kwargs):
         pass
-
-    """
-    @abstractmethod
-    def single_thread_optimize(self, *args, **kwargs):
-        pass
-        """
 
 
 class ADMM_GD(ADMM):
@@ -506,6 +569,10 @@ class OptimizerFactory:
             optimization_config["gradient"] = target_model.compute_gradient
             optimization_config["hessian"] = target_model.compute_hessian
             return NewtonMethod(optimization_config)
+        elif optimizer_type == "GraidentNewtonDescent":
+            optimization_config["gradient"] = target_model.compute_gradient
+            optimization_config["hessian"] = target_model.compute_hessian
+            return GraidentNewtonDescent(optimization_config)
         elif optimizer_type == "GradientDescentParallel":
             optimization_config["gradient"] = target_model.compute_batch_gradient
             return GradientDescentParallel(optimization_config)

@@ -172,6 +172,10 @@ class EntropicCovModel:
         # Compute Bregman without first term in case mat1 is not PSD
         return self.base_func_conjugate(mat2) - np.trace(mat1@mat2)
 
+    def compute_hessian(self, alpha):
+        # TODO: will implement this method once we have explicit formula
+        pass
+
     def compute_gradient(self, alpha):
         """
         This method computes the gradient our loss function evaluated at point
