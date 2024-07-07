@@ -46,6 +46,56 @@ class Optimizer(ABC):
         pass
 
 
+class NewtonMethod(Optimizer):
+    """
+    Performs Newton's second-order optimization.
+
+    Fields:
+    - gradient_function: Function to compute the gradient of the function
+                        to be minimized.
+    - hessian_function: Function to compute the hessian of the function
+                        to be minimized.
+    - initial_guess: Initial starting point for the algorithm.
+    - n_iter: Number of iterations to perform.
+    - tolerance: Tolerance for stopping criteria.
+
+    """
+
+    def __init__(self, optimization_config):
+        super().__init__()
+        self.gradient_function = optimization_config['gradient']
+        self.hessian_function = optimization_config['hessian']
+        self.initial_guess = optimization_config['initial_guess']
+        self.n_iter = optimization_config['n_iter']
+        self.tolerance = optimization_config['tolerance']
+
+    def optimize(self):
+        """
+        :return: vector of positions for each iteration
+        """
+
+        x = self.initial_guess
+        positions = [x]
+
+        for _ in range(self.n_iter):
+            grad = self.gradient_function(x)
+            hessian = self.hessian_function(x)
+            try:
+                hessian_inv = np.linalg.inv(hessian)
+            except np.linalg.LinAlgError:
+                print("Hessian is singular, stopping.")
+                break
+            x_new = x - np.dot(hessian_inv, grad)
+            positions.append(x_new)
+
+            # Stop if the change is smaller than the tolerance
+            if np.all(np.abs(x_new - x) <= self.tolerance):
+                break
+            x = x_new
+
+        return np.array(positions)
+
+
 class GradientDescent(Optimizer):
     """
     Performs gradient descent optimization.
@@ -452,6 +502,10 @@ class OptimizerFactory:
         if optimizer_type == "GradientDescent":
             optimization_config["gradient"] = target_model.compute_gradient
             return GradientDescent(optimization_config)
+        elif optimizer_type == "NewtonMethod":
+            optimization_config["gradient"] = target_model.compute_gradient
+            optimization_config["hessian"] = target_model.compute_hessian
+            return NewtonMethod(optimization_config)
         elif optimizer_type == "GradientDescentParallel":
             optimization_config["gradient"] = target_model.compute_batch_gradient
             return GradientDescentParallel(optimization_config)
