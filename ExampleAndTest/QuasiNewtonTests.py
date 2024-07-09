@@ -41,7 +41,7 @@ if __name__ == "__main__":
     # Construct the Entropic Covariance Model
     optimizer_type = "GradientNewtonDescent"
     initial_guess = 10 * np.random.rand(6)
-    learning_rate = 0.00005
+    learning_rate = 0.000005
     num_iterations_GD = 1000
     num_iterations_newton = 100
 
@@ -62,6 +62,8 @@ if __name__ == "__main__":
     # Print Estimate for one sample for readability
     print("1st Target C:")
     print(C[0])
+    print('Final C Estimate: ')
+    print(model.get_estimate(est_alpha[-1])[0])
 
     print("Initial alpha guess:")
     print(initial_guess)
@@ -206,3 +208,65 @@ if __name__ == "__main__":
     print(est_alpha[-1])
     print("Target alpha:")
     print([-1, 1])
+
+
+if __name__ == "__main__":
+    """
+    Test Convergence of Newton's Method Optimizer is to first simulate a covariate from a 1-d normal distribution. Then use the simulated values
+    to generate the observations 2-d multivariate observations. This causes the y_i samples to come from distinct
+    distributions whereas in first test after centering the y_i's are iid. The setup is identical to the first 
+    simulation from "The Matrix-Logarithmic Covariance Model"
+        i) x_i ~ N(5, 1)
+        ii) y_i ~ MVN(0, C(x_i))
+    Where the covariance is given as a function of x_i
+    C(x_i) = apply_inverse_link_func(A(x_i))
+    A(x_i) = [[-5 - x_i, -3 + x_i],
+              [-3 + x_i, -3 + x_i]]
+
+    Target alpha is [-5, -1, -3, 1, -3, 1]
+    """
+
+    np.random.seed(122678)
+    num_samples = 250
+
+    X = np.random.normal(5, 1, num_samples)
+    A = np.array([[[-5 - x, -3 + x], [-3 + x, -3 + x]] for x in X])
+
+    # We can try a way of implementing the transformation that doesn't conflict
+    # with factory design philosophy
+    transform, inverse_transform, _, _ = LinkFunctionFactory.create_links("SMSI")
+    C = np.array([inverse_transform(a) for a in A])
+    m = [0, 0]
+
+    Y = [np.random.multivariate_normal(m, c) for c in C]
+
+    # Construct the Entropic Covariance Model
+    optimizer_type = "NewtonMethod"
+    initial_guess = 20 * np.random.rand(6)
+    num_iterations = 50
+
+    optimization_config = {"initial_guess": initial_guess,
+                           "n_iter": num_iterations,
+                           "tolerance": 0}
+
+    model = EntropicCovModel("example_feature_map_2",
+                             "SMSI", X, Y,
+                             optimizer_type, optimization_config)
+
+    t = time.time()
+    print('Fitting Model')
+    est_alpha = model.fit()
+
+    print('Final C Estimate: ')
+    print(model.get_estimate(est_alpha[-1])[0])
+
+    # Print Estimate for one sample for readability
+    print("1st Target C:")
+    print(C[0])
+
+    print("Initial alpha guess:")
+    print(initial_guess)
+    print("Estimated alpha:")
+    print(est_alpha[-1])
+    print("Target alpha:")
+    print([-5, -1, -3, 1, -3, 1])
