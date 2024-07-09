@@ -71,6 +71,17 @@ class ExampleFeatureMap2(FeatureMapBase):
         return basis
 
 
+class ExampleFeatureMap3(FeatureMapBase):
+    # Feature map with linearly independent terms
+    def __call__(self, x):
+        u1 = np.array([[5, 3],
+                       [3, 3]])
+        u2 = np.array([[-x, x],
+                       [x, x]])
+        basis = [u1, u2]
+        return basis
+
+
 class FeatureMapFactory:
     # Define a feature map factory to produce concrete feature maps
     @staticmethod
@@ -79,5 +90,7 @@ class FeatureMapFactory:
             return ExampleFeatureMap1()
         elif map_type == "example_feature_map_2":
             return ExampleFeatureMap2()
+        elif map_type == "example_feature_map_3":
+            return ExampleFeatureMap3()
         else:
             raise ValueError(f"Unknown feature map type: {map_type}")

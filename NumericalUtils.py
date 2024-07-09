@@ -96,7 +96,7 @@ class NewtonMethod(Optimizer):
         return np.array(positions)
 
 
-class GraidentNewtonDescent(Optimizer):
+class GradientNewtonDescent(Optimizer):
     """
         Augmented descending optimization procedure to first conduct
         gradient descent to get close to local optima then performs Newton's
@@ -133,6 +133,7 @@ class GraidentNewtonDescent(Optimizer):
         x = self.initial_guess
         positions = [x]
 
+        print("Gradient Descent")
         for _ in range(self.n_iter_gd):
             grad = self.gradient_function(x)
             x_new = x - self.learning_rate * grad
@@ -145,6 +146,96 @@ class GraidentNewtonDescent(Optimizer):
                 else:
                     break
             x = x_new
+        print("Final GD est: " + str(x))
+        print("Newton's Method")
+        for _ in range(self.n_iter_newton):
+            grad = self.gradient_function(x)
+            hessian = self.hessian_function(x)
+            try:
+                hessian_inv = np.linalg.inv(hessian)
+            except np.linalg.LinAlgError:
+                print("Hessian is singular, stopping.")
+                break
+
+            x_new = x - np.dot(hessian_inv, grad)
+            positions.append(x_new)
+
+            # Stop if the change is smaller than the tolerance
+            if np.all(np.abs(x_new - x) <= self.tolerance):
+                break
+            x = x_new
+
+        print("Final Newton's method est: " + str(x))
+
+        return np.array(positions)
+
+
+class StochasticGradientNewtonDescent(Optimizer):
+    """
+        Augmented descending optimization procedure to first conduct
+        gradient descent to get close to local optima then performs Newton's
+        method to boost the convergence rate
+
+        Fields:
+        - gradient_function: Function to compute the gradient of the function
+                            to be minimized.
+        - hessian_function: Function to compute the hessian of the function
+                            to be minimized.
+        - initial_guess: Initial starting point for the algorithm.
+        - learning_rate: Learning rate (step size) for each iteration
+        - n_iter_GD: Number of iterations to perform gradient descent.
+        - n_iter_newton: Number of iterations to perform Newton's method.
+        - tolerance: Tolerance for stopping criteria.
+        - batch_size: Batch size for SGD step
+    """
+
+    def __init__(self, optimization_config):
+        super().__init__()
+        self.gradient_function = optimization_config['gradient']
+        self.batch_gradient_function = optimization_config['batch_gradient']
+        self.hessian_function = optimization_config['hessian']
+        self.initial_guess = optimization_config['initial_guess']
+        self.learning_rate = optimization_config['learning_rate_GD']
+        self.n_iter_gd = optimization_config['n_iter_GD']
+        self.n_iter_newton = optimization_config['n_iter_newton']
+        self.tolerance_gd = optimization_config['tolerance_gd']
+        self.tolerance = optimization_config['tolerance']
+        self.batch_size = optimization_config['batch_size']
+        self.num_samples = optimization_config['num_samples']
+
+    def optimize(self):
+        """
+        :return: vector of positions for each iteration
+        """
+
+        x = self.initial_guess
+        positions = [x]
+
+        print("Stochastic Gradient Descent")
+        for it in range(self.n_iter_gd):
+
+            if it%50 == 0:
+                print(str(it) + '/' + str(self.n_iter_gd))
+
+            # Randomly samples batches of specified size
+            batch_indices = np.random.choice(self.num_samples,
+                                             size=self.batch_size,
+                                             replace=False)
+
+            batch_grad = self.batch_gradient_function(x, batch_indices)
+            x_new = x - self.learning_rate * batch_grad
+            positions.append(x_new)
+
+            # Stop if the change is smaller than the tolerance
+            if np.all(np.abs(x_new - x) <= self.tolerance_gd):
+                if np.all(np.abs(x_new - x) <= self.tolerance):
+                    return np.array(positions)
+                else:
+                    break
+            x = x_new
+
+        print("Final SGD est: " + str(x))
+        print("Newton's Method")
 
         for _ in range(self.n_iter_newton):
             grad = self.gradient_function(x)
@@ -154,6 +245,7 @@ class GraidentNewtonDescent(Optimizer):
             except np.linalg.LinAlgError:
                 print("Hessian is singular, stopping.")
                 break
+
             x_new = x - np.dot(hessian_inv, grad)
             positions.append(x_new)
 
@@ -161,6 +253,8 @@ class GraidentNewtonDescent(Optimizer):
             if np.all(np.abs(x_new - x) <= self.tolerance):
                 break
             x = x_new
+
+        print("Final Newton's method est: " + str(x))
 
         return np.array(positions)
 
@@ -569,10 +663,15 @@ class OptimizerFactory:
             optimization_config["gradient"] = target_model.compute_gradient
             optimization_config["hessian"] = target_model.compute_hessian
             return NewtonMethod(optimization_config)
-        elif optimizer_type == "GraidentNewtonDescent":
+        elif optimizer_type == "GradientNewtonDescent":
             optimization_config["gradient"] = target_model.compute_gradient
             optimization_config["hessian"] = target_model.compute_hessian
-            return GraidentNewtonDescent(optimization_config)
+            return GradientNewtonDescent(optimization_config)
+        elif optimizer_type == "StochasticGradientNewtonDescent":
+            optimization_config['batch_gradient'] = target_model.compute_batch_gradient
+            optimization_config["gradient"] = target_model.compute_gradient
+            optimization_config["hessian"] = target_model.compute_hessian
+            return StochasticGradientNewtonDescent(optimization_config)
         elif optimizer_type == "GradientDescentParallel":
             optimization_config["gradient"] = target_model.compute_batch_gradient
             return GradientDescentParallel(optimization_config)

@@ -16,6 +16,7 @@ import numpy as np
 from scipy.linalg import logm
 from scipy.linalg import expm
 from scipy.linalg import sqrtm
+from scipy.linalg import inv
 
 from FeatureMapping import FeatureMapFactory
 from NumericalUtils import OptimizerFactory
@@ -173,8 +174,23 @@ class EntropicCovModel:
         return self.base_func_conjugate(mat2) - np.trace(mat1@mat2)
 
     def compute_hessian(self, alpha):
-        # TODO: will implement this method once we have explicit formula
-        pass
+        # Hessian associated with SMSI map
+
+        dim = len(self.bases[0])
+        num_samples = len(self.bases)
+        hessian = np.zeros((dim,dim))
+        A_alphas = self._compute_A_alpha(alpha)
+
+        for k in range(dim):
+            for j in range(dim):
+                summands = []
+                for i in range(num_samples):
+                    Uik = self.bases[i][k]
+                    Uij = self.bases[i][j]
+                    D = inv(sqrtm(A_alphas[i]@A_alphas[i] + 4*np.eye(len(A_alphas[0]))))
+                    summands.append(np.trace(Uik@Uij + Uik@D@Uij))
+                hessian[j][k] = np.sum(summands)
+        return hessian
 
     def compute_gradient(self, alpha):
         """
@@ -193,8 +209,6 @@ class EntropicCovModel:
             M = self.apply_link_func(A_i_alpha) - np.outer(y_i, y_i)
             U = self.bases[i]
             gradient += self._adjoint_map(U, M)
-        # Normalize gradient to avoid having to adjust LR when increasing number of samples
-        gradient = gradient/len(self.Y)
         return gradient
 
     def compute_batch_gradient(self, alpha, batch_indices):
@@ -221,8 +235,7 @@ class EntropicCovModel:
             M = self.apply_link_func(A_i_alpha) - np.outer(y_i, y_i)
             U = self.bases[i]
             gradient += self._adjoint_map(U, M)
-        # Normalize gradient to avoid having to adjust LR when increasing number of samples
-        gradient = gradient/len(batch_indices)
+        gradient = gradient
         return gradient
 
     def fit(self):
