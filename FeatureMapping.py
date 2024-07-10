@@ -95,6 +95,37 @@ class ExampleFeatureMap4(FeatureMapBase):
         return basis
 
 
+class ExampleFeatureMap5(FeatureMapBase):
+    # Feature map with nonlinear x terms
+    def __call__(self, x):
+        u1 = np.array([[x**2, 0, 0],
+                      [0, 0, 0],
+                       [0, 0, 0]])
+
+        u2 = np.array([[0, 0, 0],
+                       [0, x**2, 0],
+                       [0, 0, 0]])
+
+        u3 = np.array([[0, 0, 0],
+                       [0, 0, 0],
+                       [0, 0, x**2]])
+
+        u4 = np.array([[0, x, 0],
+                       [x, 0, 0],
+                       [0, 0, 0]])
+
+        u5 = np.array([[0, 0, 0],
+                       [0, 0, x],
+                       [0, x, 0]])
+
+        u6 = np.array([[0, 0, x],
+                       [0, 0, 0],
+                       [x, 0, 0]])
+
+        basis = [u1, u2, u3, u4, u5, u6]
+        return basis
+
+
 class FeatureMapFactory:
     # Define a feature map factory to produce concrete feature maps
     @staticmethod
@@ -107,5 +138,7 @@ class FeatureMapFactory:
             return ExampleFeatureMap3()
         elif map_type == "example_feature_map_4":
             return ExampleFeatureMap4()
+        elif map_type == "example_feature_map_5":
+            return ExampleFeatureMap5()
         else:
             raise ValueError(f"Unknown feature map type: {map_type}")
