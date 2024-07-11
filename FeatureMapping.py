@@ -124,6 +124,63 @@ class ExampleFeatureMap5(FeatureMapBase):
         return basis
 
 
+class ExampleFeatureMap6(FeatureMapBase):
+    # Feature map with nonlinear x terms
+    def __call__(self, x):
+        u1 = np.array([[x**3, 0, 0, 0],
+                      [0, 0, 0, 0],
+                       [0, 0, 0, 0],
+                       [0, 0, 0, 0]])
+
+        u2 = np.array([[0, 0, 0, 0],
+                      [0, x**3, 0, 0],
+                       [0, 0, 0, 0],
+                       [0, 0, 0, 0]])
+
+        u3 = np.array([[0, 0, 0, 0],
+                      [0, 0, 0, 0],
+                       [0, 0, x**3, 0],
+                       [0, 0, 0, 0]])
+
+        u4 = np.array([[0, 0, 0, 0],
+                      [0, 0, 0, 0],
+                       [0, 0, 0, 0],
+                       [0, 0, 0, x**3]])
+
+        u5 = np.array([[0, x**2, 0, 0],
+                      [x**2, 0, 0, 0],
+                       [0, 0, 0, 0],
+                       [0, 0, 0, 0]])
+
+        u6 = np.array([[0, 0, x**2, 0],
+                      [0, 0, 0, 0],
+                       [x**2, 0, 0, 0],
+                       [0, 0, 0, 0]])
+
+        u7 = np.array([[0, 0, 0, x],
+                       [0, 0, 0, 0],
+                       [0, 0, 0, x],
+                       [x, 0, x, 0]])
+
+        u8 = np.array([[0, 0, 0, 0],
+                       [0, 0, 0, x**3],
+                       [0, 0, 0, 0],
+                       [0, x**3, 0, 0]])
+
+        u9 = np.array([[0, 0, 0, 0],
+                       [0, 0, x, 0],
+                       [0, x, 0, 0],
+                       [0, 0, 0, 0]])
+
+        u10 = np.array([[0, 0, 0, 0],
+                       [0, 0, 0, 0],
+                       [0, 0, 0, x**2],
+                       [0, 0, x**2, 0]])
+
+        basis = [u1, u2, u3, u4, u5, u6, u7, u8, u9, u10]
+        return basis
+
+
 class FeatureMapFactory:
     # Define a feature map factory to produce concrete feature maps
     @staticmethod
@@ -138,5 +195,7 @@ class FeatureMapFactory:
             return ExampleFeatureMap4()
         elif map_type == "example_feature_map_5":
             return ExampleFeatureMap5()
+        elif map_type == "example_feature_map_6":
+            return ExampleFeatureMap6()
         else:
             raise ValueError(f"Unknown feature map type: {map_type}")
