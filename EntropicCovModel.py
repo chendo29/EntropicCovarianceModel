@@ -192,6 +192,23 @@ class EntropicCovModel:
                 hessian[j][k] = np.sum(summands)
         return hessian
 
+    def compute_hessian_diag(self, alpha):
+        # Hessian associated with SMSI map
+
+        dim = len(self.bases[0])
+        num_samples = len(self.bases)
+        hessian = np.zeros((dim,dim))
+        A_alphas = self._compute_A_alpha(alpha)
+
+        for j in range(dim):
+            summands = []
+            for i in range(num_samples):
+                Uij = self.bases[i][j]
+                D = inv(sqrtm(A_alphas[i]@A_alphas[i] + 4*np.eye(len(A_alphas[0]))))
+                summands.append(np.trace(Uij@Uij + Uij@D@Uij))
+            hessian[j][j] = np.sum(summands)
+        return hessian
+
     def compute_gradient(self, alpha):
         """
         This method computes the gradient our loss function evaluated at point

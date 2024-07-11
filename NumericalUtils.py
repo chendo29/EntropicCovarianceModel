@@ -159,13 +159,12 @@ class GradientNewtonDescent(Optimizer):
 
             x_new = x - np.dot(hessian_inv, grad)
             positions.append(x_new)
+            print("Newton's method est: " + str(x))
 
             # Stop if the change is smaller than the tolerance
             if np.all(np.abs(x_new - x) <= self.tolerance):
                 break
             x = x_new
-
-        print("Final Newton's method est: " + str(x))
 
         return np.array(positions)
 
@@ -248,13 +247,12 @@ class StochasticGradientNewtonDescent(Optimizer):
 
             x_new = x - np.dot(hessian_inv, grad)
             positions.append(x_new)
+            print("Newton's method est: " + str(x))
 
             # Stop if the change is smaller than the tolerance
             if np.all(np.abs(x_new - x) <= self.tolerance):
                 break
             x = x_new
-
-        print("Final Newton's method est: " + str(x))
 
         return np.array(positions)
 
@@ -663,6 +661,10 @@ class OptimizerFactory:
             optimization_config["gradient"] = target_model.compute_gradient
             optimization_config["hessian"] = target_model.compute_hessian
             return NewtonMethod(optimization_config)
+        elif optimizer_type == "QuasiNewtonMethod":
+            optimization_config["gradient"] = target_model.compute_gradient
+            optimization_config["hessian"] = target_model.compute_hessian_diag
+            return GradientNewtonDescent(optimization_config)
         elif optimizer_type == "GradientNewtonDescent":
             optimization_config["gradient"] = target_model.compute_gradient
             optimization_config["hessian"] = target_model.compute_hessian
@@ -671,6 +673,11 @@ class OptimizerFactory:
             optimization_config['batch_gradient'] = target_model.compute_batch_gradient
             optimization_config["gradient"] = target_model.compute_gradient
             optimization_config["hessian"] = target_model.compute_hessian
+            return StochasticGradientNewtonDescent(optimization_config)
+        elif optimizer_type == "StochasticGradientQuasiNewtonDescent":
+            optimization_config['batch_gradient'] = target_model.compute_batch_gradient
+            optimization_config["gradient"] = target_model.compute_gradient
+            optimization_config["hessian"] = target_model.compute_hessian_diag
             return StochasticGradientNewtonDescent(optimization_config)
         elif optimizer_type == "GradientDescentParallel":
             optimization_config["gradient"] = target_model.compute_batch_gradient

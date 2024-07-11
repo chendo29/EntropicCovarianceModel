@@ -74,11 +74,9 @@ class ExampleFeatureMap2(FeatureMapBase):
 class ExampleFeatureMap3(FeatureMapBase):
     # Feature map with linearly independent terms
     def __call__(self, x):
-        u1 = np.array([[5, 3],
-                       [3, 3]])
-        u2 = np.array([[-x, x],
+        u1 = np.array([[-x, x],
                        [x, x]])
-        basis = [u1, u2]
+        basis = [u1]
         return basis
 
 
