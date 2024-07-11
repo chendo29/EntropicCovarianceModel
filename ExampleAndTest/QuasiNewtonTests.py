@@ -9,7 +9,7 @@ import time
 from EntropicCovModel import EntropicCovModel, LinkFunctionFactory
 
 
-if __name__ == "1__main__":
+if __name__ == "__main__":
     """
     Test Convergence of Newton Descent Optimizer is to first simulate a covariate from a 1-d normal distribution. Then use the simulated values
     to generate the observations 2-d multivariate observations. This causes the y_i samples to come from distinct
@@ -74,7 +74,7 @@ if __name__ == "1__main__":
     print([-5, -1, -3, 1, -3, 1])
 
 
-if __name__ == "1__main__":
+if __name__ == "__main__":
     """
     Test Convergence of Stochastic Newton Descent Optimizer is to first simulate a covariate from a 1-d normal distribution. Then use the simulated values
     to generate the observations 2-d multivariate observations. This causes the y_i samples to come from distinct
@@ -143,7 +143,7 @@ if __name__ == "1__main__":
     print([-5, -1, -3, 1, -3, 1])
 
 
-if __name__ == "1__main__":
+if __name__ == "__main__":
     """
     Test Convergence of Stochastic Newton Descent Optimizer is to first simulate a covariate from a 1-d normal distribution. Then use the simulated values
     to generate the observations 2-d multivariate observations. This causes the y_i samples to come from distinct
@@ -212,7 +212,7 @@ if __name__ == "1__main__":
     print([1])
 
 
-if __name__ == "1__main__":
+if __name__ == "__main__":
     """
     Test Convergence of Newton's Method Optimizer is to first simulate a covariate from a 1-d normal distribution. Then use the simulated values
     to generate the observations 2-d multivariate observations. This causes the y_i samples to come from distinct
@@ -274,7 +274,7 @@ if __name__ == "1__main__":
     print([-5, -1, -3, 1, -3, 1])
 
 
-if __name__ == "1__main__":
+if __name__ == "__main__":
     """
     Test Convergence of Stochastic Newton Descent Optimizer on feature maps with non linear covariate terms is to first
     simulate a covariate from a 1-d normal distribution. Then use the simulated values
@@ -345,7 +345,7 @@ if __name__ == "1__main__":
     print([5, 2, 5])
 
 
-if __name__ == "1__main__":
+if __name__ == "__main__":
     """
     Test Convergence of Stochastic Newton Descent Optimizer on feature maps with non linear covariate terms is to first
     simulate a covariate from a 1-d normal distribution. Then use the simulated values
