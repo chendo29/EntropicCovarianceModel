@@ -154,6 +154,7 @@ class EntropicCovModel:
         self.link_func, self.inverse_link_func, self.base_func, \
         self.base_func_conjugate = LinkFunctionFactory.create_links(link_type)
         self.Y = response_vector
+        self.feature_map_type = feature_map_type
         self.bases = SubspaceBases(feature_map_type, design_matrix).get_subspace_basis()
         self.optimizer = OptimizerFactory.create_optimizer(optimizer_type,
                                                            optimization_conifg,
@@ -266,6 +267,15 @@ class EntropicCovModel:
 
     def get_A_alpha(self, alpha):
         return self._compute_A_alpha(alpha)
+
+    def predict(self, X, alphas):
+        predicted_bases = SubspaceBases(self.feature_map_type, X).get_subspace_basis()
+        predicted_matrices = []
+        for base in predicted_bases:
+            transform_mat = np.sum([a * u for a, u in zip(alphas, base)])
+            inverse_transform_mat = self.inverse_link_func(transform_mat)
+            predicted_matrices.append(inverse_transform_mat)
+        return predicted_matrices
 
     """
     The followings are private helper method to be used in the body of 
