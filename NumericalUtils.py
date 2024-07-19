@@ -69,7 +69,7 @@ class NewtonMethod(Optimizer):
         self.n_iter = optimization_config['n_iter']
         self.tolerance = optimization_config['tolerance']
 
-    def optimize(self):
+    def optimize(self, verbose=False):
         """
         :return: vector of positions for each iteration
         """
@@ -125,7 +125,7 @@ class GradientNewtonDescent(Optimizer):
         self.tolerance_gd = optimization_config['tolerance_gd']
         self.tolerance = optimization_config['tolerance']
 
-    def optimize(self):
+    def optimize(self, verbose=False):
         """
         :return: vector of positions for each iteration
         """
@@ -133,7 +133,8 @@ class GradientNewtonDescent(Optimizer):
         x = self.initial_guess
         positions = [x]
 
-        print("Gradient Descent")
+        if verbose is True:
+            print("Gradient Descent")
         for _ in range(self.n_iter_gd):
             grad = self.gradient_function(x)
             x_new = x - self.learning_rate * grad
@@ -146,8 +147,10 @@ class GradientNewtonDescent(Optimizer):
                 else:
                     break
             x = x_new
-        print("Final GD est: " + str(x))
-        print("Newton's Method")
+
+        if verbose is True:
+            print("Final GD est: " + str(x))
+            print("Newton's Method")
         for _ in range(self.n_iter_newton):
             grad = self.gradient_function(x)
             hessian = self.hessian_function(x)
@@ -159,7 +162,8 @@ class GradientNewtonDescent(Optimizer):
 
             x_new = x - np.dot(hessian_inv, grad)
             positions.append(x_new)
-            print("Newton's method est: " + str(x))
+            if verbose is True:
+                print("Newton's method est: " + str(x))
 
             # Stop if the change is smaller than the tolerance
             if np.all(np.abs(x_new - x) <= self.tolerance):
@@ -202,7 +206,7 @@ class StochasticGradientNewtonDescent(Optimizer):
         self.batch_size = optimization_config['batch_size']
         self.num_samples = optimization_config['num_samples']
 
-    def optimize(self):
+    def optimize(self, verbose=False):
         """
         :return: vector of positions for each iteration
         """
@@ -210,11 +214,13 @@ class StochasticGradientNewtonDescent(Optimizer):
         x = self.initial_guess
         positions = [x]
 
-        print("Stochastic Gradient Descent")
+        if verbose is True:
+            print("Stochastic Gradient Descent")
         for it in range(self.n_iter_gd):
 
-            if it%50 == 0:
-                print(str(it) + '/' + str(self.n_iter_gd))
+            if it % 50 == 0:
+                if verbose is True:
+                    print(str(it) + '/' + str(self.n_iter_gd))
 
             # Randomly samples batches of specified size
             batch_indices = np.random.choice(self.num_samples,
@@ -233,8 +239,9 @@ class StochasticGradientNewtonDescent(Optimizer):
                     break
             x = x_new
 
-        print("Final SGD est: " + str(x))
-        print("Newton's Method")
+        if verbose is True:
+            print("Final SGD est: " + str(x))
+            print("Newton's Method")
 
         for _ in range(self.n_iter_newton):
             grad = self.gradient_function(x)
@@ -247,7 +254,8 @@ class StochasticGradientNewtonDescent(Optimizer):
 
             x_new = x - np.dot(hessian_inv, grad)
             positions.append(x_new)
-            print("Newton's method est: " + str(x))
+            if verbose is True:
+                print("Newton's method est: " + str(x))
 
             # Stop if the change is smaller than the tolerance
             if np.all(np.abs(x_new - x) <= self.tolerance):
@@ -278,7 +286,7 @@ class GradientDescent(Optimizer):
         self.n_iter = optimization_config['n_iter']
         self.tolerance = optimization_config['tolerance']
 
-    def optimize(self):
+    def optimize(self, verbose=False):
         """
         :return: vector of positions for each iteration
         """
@@ -327,7 +335,7 @@ class GradientDescentParallel(Optimizer):
         self.tolerance = optimization_config['tolerance']
         self.num_samples = optimization_config['num_samples']
 
-    def optimize(self):
+    def optimize(self, verbose=False):
         """
         :return: vector of positions for each iteration
         """
@@ -403,7 +411,7 @@ class SGD(Optimizer):
         self.batch_size = optimization_config['batch_size']
         self.num_samples = optimization_config['num_samples']
 
-    def optimize(self):
+    def optimize(self, verbose=False):
         """
         :return: vector of positions for each iteration
         """
@@ -411,9 +419,9 @@ class SGD(Optimizer):
         x = self.initial_guess
         positions = [x]
         for it in range(self.n_iter):
-
-            if it%50 == 0:
-                print(str(it) + '/' + str(self.n_iter))
+            if it % 50 == 0:
+                if verbose is True:
+                    print(str(it) + '/' + str(self.n_iter))
 
             # Randomly samples batches of specified size
             batch_indices = np.random.choice(self.num_samples,
@@ -578,10 +586,12 @@ class ADMM_GD_NoPen(ADMM):
             "loss_function_gradient"]
         self.num_of_samples = optimization_config["num_of_samples"]
 
-    def optimize(self):
-        print("Iterations:")
+    def optimize(self, verbose=False):
+        if verbose is True:
+            print("Iterations:")
         for it in range(self.max_iter):
-            print(str(it + 1) + "/" + str(self.max_iter))
+            if verbose is True:
+                print(str(it + 1) + "/" + str(self.max_iter))
             # batch updates of alphas
             self._batch_alpha_update()
             # update for the center position

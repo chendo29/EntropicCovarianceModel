@@ -256,8 +256,8 @@ class EntropicCovModel:
         gradient = gradient
         return gradient
 
-    def fit(self):
-        return self.optimizer.optimize()
+    def fit(self, verbose=False):
+        return self.optimizer.optimize(verbose)
 
     def get_estimate(self, alpha):
         A_alpha = self._compute_A_alpha(alpha)
