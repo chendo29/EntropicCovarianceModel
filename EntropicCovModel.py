@@ -256,8 +256,11 @@ class EntropicCovModel:
         gradient = gradient
         return gradient
 
-    def fit(self, verbose=False):
-        return self.optimizer.optimize(verbose)
+    def fit(self, verbose=False, save_path=True):
+        if save_path:
+            return self.optimizer.optimize(verbose)
+        else:
+            return self.optimizer.optimize(verbose)[-1]
 
     def get_estimate(self, alpha):
         A_alpha = self._compute_A_alpha(alpha)
@@ -272,7 +275,7 @@ class EntropicCovModel:
         predicted_bases = SubspaceBases(self.feature_map_type, X).get_subspace_basis()
         predicted_matrices = []
         for base in predicted_bases:
-            transform_mat = np.sum([a * u for a, u in zip(alphas, base)])
+            transform_mat = np.sum([a * u for a, u in zip(alphas, base)], axis=0)
             inverse_transform_mat = self.inverse_link_func(transform_mat)
             predicted_matrices.append(inverse_transform_mat)
         return predicted_matrices
