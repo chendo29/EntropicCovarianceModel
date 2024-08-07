@@ -181,6 +181,26 @@ class ExampleFeatureMap6(FeatureMapBase):
         return basis
 
 
+class DistanceFeatureMap(FeatureMapBase):
+    """
+    Feature Map inspired bt "Covariance Model with General Linear Structure
+    and Divergent Parameters
+    X assumed to be a pxK matrix where p is the dimension of the response
+    variable Y
+    """
+    def __call__(self, x):
+        p, K = x.shape
+        basis = []
+        basis.append(np.eye(p))
+        for k in range(K):
+            # Compute weight matrix W
+            i, j = np.ogrid[:p, :p]
+            wk = np.exp(-(x[i, k] - x[j, k])**2)
+            np.fill_diagonal(wk, 0)
+            basis.append(wk)
+        return np.array(basis)
+
+
 class FeatureMapFactory:
     # Define a feature map factory to produce concrete feature maps
     @staticmethod
@@ -197,5 +217,8 @@ class FeatureMapFactory:
             return ExampleFeatureMap5()
         elif map_type == "example_feature_map_6":
             return ExampleFeatureMap6()
+        elif map_type == "distance_feature_map":
+            return DistanceFeatureMap()
         else:
             raise ValueError(f"Unknown feature map type: {map_type}")
+
